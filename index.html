@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- TÍTULO DA ABA ALTERADO -->
+    <title>Checklist Processual - Spencer Advogados</title>
+    <!-- Carrega Tailwind CSS para estilização rápida e responsiva -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-blue': '#1e40af', // Blue 700
+                        'secondary-yellow': '#f59e0b', // Amber 500
+                        'tertiary-green': '#10b981', // Emerald 500
+                        'quaternary-red': '#ef4444', // Red 500
+                        'gray-dark': '#1f2937', // Gray 800
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos personalizados para o checklist */
+        body {
+            background-color: #f3f4f6; /* Fundo cinza claro */
+            min-height: 100vh;
+        }
+
+        .phase-header {
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left-width: 8px;
+            padding-left: 1rem;
+        }
+
+        .phase-0 { border-color: #f59e0b; /* Amarelo - PREPARAÇÃO */ }
+        .phase-1 { border-color: #ef4444; /* Vermelho/Laranja - ESTRATÉGIA */ }
+        .phase-2 { border-color: #1e40af; /* Azul - CONFORMIDADE */ }
+        .phase-3 { border-color: #10b981; /* Verde - REDAÇÃO */ }
+        .phase-4 { border-color: #1f2937; /* Preto - PROTOCOLO */ }
+
+        /* Estilo para riscar o texto do item concluído */
+        .checked-text {
+            text-decoration: line-through;
+            color: #9ca3af; /* Cinza */
+        }
+
+        /* Estilo para o campo de data e nome que aparecerão no PDF */
+        .pdf-input {
+            border: none;
+            border-bottom: 1px dashed #6b7280;
+            padding: 0.25rem 0.5rem;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        .pdf-input:focus {
+            outline: none;
+            border-bottom: 1px solid #1e40af;
+        }
+
+        /* Esconde o conteúdo que não deve aparecer no PDF (ex: botão de download) */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: white;
+            }
+            .checklist-item-container {
+                page-break-inside: avoid;
+            }
+            /* Garante que o campo de anotações não tenha borda no PDF */
+            #generalComments {
+                border: none !important;
+                resize: none !important;
+            }
+            .comments-section {
+                border: 1px solid #e5e7eb; /* Borda leve para delimitar a área de comentários */
+                padding: 1rem;
+                margin-top: 1.5rem;
+                margin-bottom: 1.5rem;
+                border-radius: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="font-sans text-gray-800">
+
+    <div class="max-w-4xl mx-auto p-4 md:p-8">
+        
+        <!-- NOVO BOTÃO DE LIMPAR CHECKLIST -->
+        <div class="mb-4 flex justify-end no-print">
+            <button onclick="clearChecklist()" class="text-sm text-gray-500 hover:text-quaternary-red transition-colors flex items-center p-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-quaternary-red focus:ring-opacity-50">
+                <!-- Ícone de Lixeira (lucide-react, simulado com SVG) -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1">
+                    <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+                Limpar Checklist
+            </button>
+        </div>
+        
+        <!-- Título e Introdução -->
+        <header class="mb-8">
+            <!-- TÍTULO H1 ALTERADO -->
+            <h1 class="text-4xl font-extrabold text-primary-blue mb-2">
+                Checklist Processual - Spencer Advogados
+            </h1>
+            <p class="text-lg text-gray-600">
+                Guia passo a passo para a elaboração de peças processuais, garantindo conformidade e estratégia.
+            </p>
+            <!-- Campos para o PDF -->
+            <div class="mt-4 p-4 bg-white shadow-md rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Peça/Processo:</label>
+                    <input id="processoNome" type="text" placeholder="Nome da Peça ou Nº do Processo" class="pdf-input" value="Petição Inicial - Caso [Nº]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Responsável:</label>
+                    <input id="responsavelNome" type="text" placeholder="Seu Nome ou Advogado Responsável" class="pdf-input" value="Dra. [Seu Nome]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Data de Conclusão:</label>
+                    <input id="dataConclusao" type="date" class="pdf-input" value="">
+                </div>
+            </div>
+        </header>
+
+        <!-- Container Principal do Checklist -->
+        <div id="checklistContainer" class="space-y-6">
+            <!-- As fases do checklist serão renderizadas aqui -->
+        </div>
+
+        <!-- Nova Seção: Comentários e Anotações -->
+        <section class="comments-section mt-10 p-6 bg-white shadow-lg rounded-xl">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 mr-3 text-secondary-yellow">
+                    <path d="M12 2a10 10 0 0 0-9.28 14c-.1.5.3 1.1.8 1.1h.5a1 1 0 0 1 .8.4l1.8 3.3a.5.5 0 0 0 .8.1l2.4-1.9a1 1 0 0 1 .5-.1h1.7a10 10 0 0 0 9.28-14Z"/>
+                    <path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M12 10h.01"/>
+                </svg>
+                Anotações e Observações Finais
+            </h2>
+            <textarea
+                id="generalComments"
+                class="w-full p-4 h-40 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue transition-colors text-sm resize-y"
+                placeholder="Registre aqui informações adicionais sobre o caso, dúvidas para o gestor, teses inovadoras aplicadas, ou motivos de exclusão de algum item do checklist (ex: 'Não há justiça gratuita, custas recolhidas')."
+                oninput="saveComments()"
+            ></textarea>
+        </section>
+
+        <!-- Rodapé e Botões -->
+        <footer class="mt-10 pt-6 border-t border-gray-300 no-print">
+            <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                <!-- Barra de Progresso -->
+                <div class="w-full sm:w-1/2">
+                    <div class="text-sm font-medium text-gray-600 mb-1">Progresso: <span id="progressText">0%</span></div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="progressBar" class="bg-primary-blue h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Botão de Download PDF -->
+                <button onclick="downloadPDF()" class="w-full sm:w-auto px-6 py-3 bg-secondary-yellow text-white font-bold rounded-xl shadow-lg hover:bg-yellow-600 transition-colors flex items-center justify-center">
+                    <!-- Ícone de Download (lucide-react, simulado com SVG) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
+                        <path d="M12 17v-13"/><path d="m6 10 6 6 6-6"/><path d="M19 16v3a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3"/>
+                    </svg>
+                    Baixar Checklist (PDF)
+                </button>
+            </div>
+
+             <p class="text-center text-xs text-gray-500 mt-4">
+                Dica: O download gera uma versão imprimível da tela.
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Constantes para chaves do localStorage
+        const CHECKLIST_KEY = 'processualChecklistStatus';
+        const COMMENTS_KEY = 'processualComments';
+
+        // Dados do Checklist extraídos do documento
+        const checklistData = [
+            {
+                id: 'phase0',
+                title: 'FASE 0 — PREPARAÇÃO DOCUMENTAL',
+                colorClass: 'phase-0',
+                items: [
+                    'Baixar todos os documentos disponíveis do cliente/sistema.',
+                    'Renomear e organizar documentos por assunto + data.',
+                    'Verificar legibilidade, integridade e tamanho do arquivo (conformidade do sistema judicial de destino).',
+                    'Montar linha do tempo dos fatos correlacionando com datas e sequenciado de maneira lógica e indutivo, inserir quadro resumo (verificar plataforma de legal design).',
+                    'Topicar os elementos de direito (princípios, lei, jurisprudência) que vão fundamentar a ação.'
+                ]
+            },
+            {
+                id: 'phase1',
+                title: 'FASE 1 — ESTRATÉGIA JURÍDICA',
+                colorClass: 'phase-1',
+                items: [
+                    'Pesquisar jurisprudência específica do tribunal local + STJ/STF.',
+                    'Verificar precedente obrigatório / tema repetitivo / IRDR / súmula.',
+                    'Estudar lei, doutrina (material e processual) alvo e (opcional) video aula de reforço.',
+                    'Mapear tese principal + teses subsidiárias.',
+                    'Topificar a peça: Fatos / Preliminares / Mérito / Provas / Pedidos.',
+                    'Validar estratégia/processo com gestor.'
+                ]
+            },
+            {
+                id: 'phase2',
+                title: 'FASE 2 — CONFORMIDADE PROCESSUAL',
+                colorClass: 'phase-2',
+                items: [
+                    'Conferir procuração, substabelecimento, ata, contrato social.',
+                    'Conferir competência / prevenção / litispendência / conexão / rito.',
+                    'Calcular valor da causa corretamente (vencidas + vincendas, se for o caso).',
+                    'Definir se haverá justiça gratuita ou recolhimento de custas.',
+                    'Verificar prazos processuais e feriado local com prova.',
+                    'Analisar necessidade de prova testemunhal, pericial, quesitos, prova técnica.'
+                ]
+            },
+            {
+                id: 'phase3',
+                title: 'FASE 3 — REDAÇÃO DA PEÇA',
+                colorClass: 'phase-3',
+                items: [
+                    'Redigir fatos cronologicamente e com citação cruzada dos documentos.',
+                    'Citar cada documento com (Doc. 01, p. 2) no texto.',
+                    'Inserir preliminares e prejudiciais, se houver.',
+                    'Desenvolver mérito por tópicos separados e objetivos.',
+                    'Inserir jurisprudência atual e coerente com a tese.',
+                    'Formular pedidos claros, certos, determinados, numerados.',
+                    'Incluir tutela provisória com demonstração de requisitos (se couber).',
+                    'Incluir pedido de prova (perícia, testemunhas, inversão ônus, etc.).',
+                    'Finalizar com fecho + requerimento de intimação + condenação sucumbência.',
+                    'Montar índice dos anexos/documentos ao final.',
+                    'Revisar no robô o texto para não ter erros vernaculares.'
+                ]
+            },
+            {
+                id: 'phase4',
+                title: 'FASE 5 — PROTOCOLO E PÓS-PROTOCOLO',
+                colorClass: 'phase-4',
+                items: [
+                    'Protocolar/distribuir na classe correta.',
+                    'Testar antes: jurisdição, anexos, visualização, valor da causa.',
+                    'Salvar comprovante em PDF com nome padrão.',
+                    'Informar cliente (nº do processo + situação + próximos passos).',
+                    'Registrar no sistema / AdvBox.'
+                ]
+            }
+        ];
+
+        // Variável de estado para armazenar o status do checklist (usando localStorage)
+        let checklistStatus = JSON.parse(localStorage.getItem(CHECKLIST_KEY)) || {};
+
+        /**
+         * Renderiza todo o checklist na interface.
+         */
+        function renderChecklist() {
+            const container = document.getElementById('checklistContainer');
+            container.innerHTML = ''; // Limpa o container
+
+            checklistData.forEach(phase => {
+                const isPhaseExpanded = checklistStatus[phase.id]?.isExpanded !== false; // Padrão: expandido
+
+                // Cria o cabeçalho da fase
+                const header = document.createElement('div');
+                header.className = `phase-header bg-white p-4 shadow-lg rounded-xl flex justify-between items-center ${phase.colorClass}`;
+                header.setAttribute('data-phase-id', phase.id);
+                header.onclick = togglePhase;
+
+                // Título da Fase
+                const title = document.createElement('h2');
+                title.className = 'text-xl font-bold text-gray-800';
+                title.textContent = phase.title;
+                header.appendChild(title);
+
+                // Ícone de expansão (Chevron)
+                const icon = document.createElement('div');
+                icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-600 transition-transform duration-300 ${isPhaseExpanded ? 'rotate-180' : 'rotate-0'}">
+                    <path d="m6 9 6 6 6-6"/>
+                </svg>`;
+                header.appendChild(icon);
+
+                // Cria o corpo da fase (itens)
+                const body = document.createElement('div');
+                body.id = phase.id + '-body';
+                body.className = `p-4 pt-0 bg-white shadow-xl rounded-b-xl transition-all duration-300 overflow-hidden ${isPhaseExpanded ? 'max-h-screen' : 'max-h-0'}`;
+
+                // Lista de Itens
+                const ul = document.createElement('ul');
+                ul.className = 'space-y-3';
+                ul.style.marginTop = '1rem'; // Adiciona um espaçamento interno
+
+                phase.items.forEach((itemText, itemIndex) => {
+                    const itemId = `${phase.id}-${itemIndex}`;
+                    const isChecked = checklistStatus[itemId] || false;
+
+                    const liContainer = document.createElement('div');
+                    liContainer.className = 'checklist-item-container flex items-start space-x-3 py-2 border-b border-gray-100 last:border-b-0';
+
+                    // Checkbox
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = itemId;
+                    checkbox.checked = isChecked;
+                    checkbox.className = 'mt-1 h-5 w-5 rounded text-primary-blue border-gray-300 focus:ring-primary-blue cursor-pointer';
+                    checkbox.onchange = () => toggleItem(itemId, itemText, checkbox.checked);
+
+                    // Label/Texto do Item
+                    const label = document.createElement('label');
+                    label.htmlFor = itemId;
+                    label.className = `text-base flex-1 leading-relaxed cursor-pointer ${isChecked ? 'checked-text' : ''}`;
+                    label.textContent = itemText;
+
+                    liContainer.appendChild(checkbox);
+                    liContainer.appendChild(label);
+                    ul.appendChild(liContainer);
+                });
+
+                body.appendChild(ul);
+
+                // Adiciona o cabeçalho e o corpo ao container principal
+                container.appendChild(header);
+                container.appendChild(body);
+            });
+
+            updateProgress();
+        }
+
+        /**
+         * Alterna o estado de um item (marcado/desmarcado) e salva o estado.
+         * @param {string} id - O ID único do item (fase-indice).
+         * @param {string} text - O texto do item.
+         * @param {boolean} checked - O novo estado.
+         */
+        function toggleItem(id, text, checked) {
+            checklistStatus[id] = checked;
+            localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklistStatus));
+
+            // Atualiza o estilo do texto
+            const label = document.querySelector(`label[for="${id}"]`);
+            if (label) {
+                label.classList.toggle('checked-text', checked);
+            }
+
+            updateProgress();
+        }
+
+        /**
+         * Alterna a expansão/colapso de uma fase.
+         * @param {Event} event - Evento de clique.
+         */
+        function togglePhase(event) {
+            const header = event.currentTarget;
+            const phaseId = header.getAttribute('data-phase-id');
+            const body = document.getElementById(phaseId + '-body');
+            const icon = header.querySelector('svg');
+
+            // Atualiza o estado de expansão
+            const isExpanded = body.classList.contains('max-h-screen');
+            const newExpandedState = !isExpanded;
+
+            // Salva o estado de expansão
+            if (!checklistStatus[phaseId]) checklistStatus[phaseId] = {};
+            checklistStatus[phaseId].isExpanded = newExpandedState;
+            localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklistStatus));
+
+            // Aplica as classes Tailwind
+            if (newExpandedState) {
+                body.classList.remove('max-h-0');
+                body.classList.add('max-h-screen');
+                icon.classList.add('rotate-180');
+                icon.classList.remove('rotate-0');
+            } else {
+                body.classList.remove('max-h-screen');
+                body.classList.add('max-h-0');
+                icon.classList.remove('rotate-180');
+                icon.classList.add('rotate-0');
+            }
+        }
+
+        /**
+         * Calcula e atualiza a barra e o texto de progresso.
+         */
+        function updateProgress() {
+            let totalItems = 0;
+            let checkedItems = 0;
+
+            checklistData.forEach(phase => {
+                phase.items.forEach((itemText, itemIndex) => {
+                    const itemId = `${phase.id}-${itemIndex}`;
+                    totalItems++;
+                    if (checklistStatus[itemId]) {
+                        checkedItems++;
+                    }
+                });
+            });
+
+            const percentage = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
+
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+
+            if (progressBar && progressText) {
+                progressBar.style.width = `${percentage}%`;
+                progressBar.classList.toggle('bg-tertiary-green', percentage === 100);
+                progressBar.classList.toggle('bg-primary-blue', percentage !== 100);
+                progressText.textContent = `${percentage}% (${checkedItems} de ${totalItems} itens)`;
+            }
+
+             // Define a data de conclusão automaticamente quando o progresso chega a 100%
+            if (percentage === 100) {
+                const dataInput = document.getElementById('dataConclusao');
+                if (!dataInput.value) {
+                    // Formata a data como YYYY-MM-DD
+                    const today = new Date().toISOString().substring(0, 10);
+                    dataInput.value = today;
+                }
+            }
+        }
+
+        /**
+         * Salva o conteúdo do campo de comentários no localStorage.
+         */
+        function saveComments() {
+            const commentsArea = document.getElementById('generalComments');
+            if (commentsArea) {
+                localStorage.setItem(COMMENTS_KEY, commentsArea.value);
+            }
+        }
+
+        /**
+         * Carrega o conteúdo do campo de comentários do localStorage.
+         */
+        function loadComments() {
+            const commentsArea = document.getElementById('generalComments');
+            if (commentsArea) {
+                const savedComments = localStorage.getItem(COMMENTS_KEY);
+                if (savedComments) {
+                    commentsArea.value = savedComments;
+                }
+            }
+        }
+        
+        /**
+         * Limpa todo o checklist (itens marcados e comentários) e reseta a interface.
+         * Esta função deve ser chamada pelo botão de Limpar.
+         */
+        function clearChecklist() {
+            // Utilizamos um alerta discreto no console, pois alert/confirm/prompt são proibidos no ambiente.
+            console.log("AVISO: Tentativa de limpeza total do checklist. Todo o progresso salvo será apagado.");
+            
+            // 1. Limpa o localStorage
+            localStorage.removeItem(CHECKLIST_KEY);
+            localStorage.removeItem(COMMENTS_KEY);
+
+            // 2. Reseta o estado local
+            checklistStatus = {};
+
+            // 3. Reseta os campos de cabeçalho para valores padrão
+            document.getElementById('processoNome').value = "Petição Inicial - Caso [Nº]";
+            document.getElementById('responsavelNome').value = "Dra. [Seu Nome]";
+            
+            // 4. Limpa e reseta a data de hoje (para garantir consistência)
+            const today = new Date().toISOString().substring(0, 10);
+            document.getElementById('dataConclusao').value = today;
+            
+            // 5. Limpa a área de comentários
+            const commentsArea = document.getElementById('generalComments');
+            if (commentsArea) {
+                commentsArea.value = '';
+            }
+            
+            // 6. Recarrega a renderização do checklist
+            renderChecklist(); 
+            // 7. Garante que o progresso está zerado
+            updateProgress(); 
+        }
+
+
+        /**
+         * Inicia o processo de download, que usa a função nativa de impressão para gerar um PDF.
+         * Nota: O recurso 'no-print' esconde elementos irrelevantes para o documento.
+         */
+        function downloadPDF() {
+            // Expande todas as fases antes de imprimir
+            checklistData.forEach(phase => {
+                const body = document.getElementById(phase.id + '-body');
+                const header = document.querySelector(`.phase-header[data-phase-id="${phase.id}"]`);
+                const icon = header.querySelector('svg');
+
+                // Garante que o corpo está visível para a impressão
+                body.classList.remove('max-h-0');
+                body.classList.add('max-h-screen');
+                icon.classList.add('rotate-180');
+                icon.classList.remove('rotate-0');
+
+                // Atualiza o estado de expansão no localStorage (para não confundir o usuário depois)
+                if (!checklistStatus[phase.id]) checklistStatus[phase.id] = {};
+                checklistStatus[phase.id].isExpanded = true;
+            });
+            localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklistStatus));
+
+            // Atualiza os campos de cabeçalho para ter certeza que estão no PDF
+            document.getElementById('dataConclusao').value = document.getElementById('dataConclusao').value || new Date().toISOString().substring(0, 10);
+
+            // Chama a função de impressão (que permite salvar como PDF)
+            window.print();
+        }
+
+        // Configura a data de conclusão para a data de hoje ao carregar, se vazia
+        document.addEventListener('DOMContentLoaded', () => {
+            const dataInput = document.getElementById('dataConclusao');
+            if (!dataInput.value) {
+                const today = new Date().toISOString().substring(0, 10);
+                dataInput.value = today;
+            }
+
+            // Inicializa e renderiza o checklist
+            renderChecklist();
+            // Carrega os comentários salvos
+            loadComments();
+        });
+    </script>
+</body>
+</html>
