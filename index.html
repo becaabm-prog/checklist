@@ -39,10 +39,11 @@
             padding-left: 1rem;
         }
 
-        .phase-0 { border-color: #f59e0b; /* Amarelo - PREPARAÇÃO */ }
-        .phase-1 { border-color: #ef4444; /* Vermelho/Laranja - ESTRATÉGIA */ }
+        /* Cores das Fases - Reutilizadas */
+        .phase-0 { border-color: #f59e0b; /* Amarelo - PREPARAÇÃO / ESTRUTURA */ }
+        .phase-1 { border-color: #ef4444; /* Vermelho/Laranja - ESTRATÉGIA / CONTEÚDO */ }
         .phase-2 { border-color: #1e40af; /* Azul - CONFORMIDADE */ }
-        .phase-3 { border-color: #10b981; /* Verde - REDAÇÃO */ }
+        .phase-3 { border-color: #10b981; /* Verde - REDAÇÃO / REVISÃO */ }
         .phase-4 { border-color: #1f2937; /* Preto - PROTOCOLO */ }
 
         /* Estilo para riscar o texto do item concluído */
@@ -94,8 +95,15 @@
 
     <div class="max-w-4xl mx-auto p-4 md:p-8">
         
-        <!-- NOVO BOTÃO DE LIMPAR CHECKLIST -->
-        <div class="mb-4 flex justify-end no-print">
+        <!-- TOP CONTROLS: LIMPAR E TOGGLE MODE -->
+        <div class="mb-4 flex justify-between items-center no-print">
+            
+            <!-- TOGGLE MODE -->
+            <button id="modeToggle" onclick="switchChecklistMode()" class="px-3 py-1 bg-primary-blue text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-800 transition-colors">
+                Alternar para Peças Simples
+            </button>
+
+            <!-- BOTÃO DE LIMPAR CHECKLIST -->
             <button onclick="clearChecklist()" class="text-sm text-gray-500 hover:text-quaternary-red transition-colors flex items-center p-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-quaternary-red focus:ring-opacity-50">
                 <!-- Ícone de Lixeira (lucide-react, simulado com SVG) -->
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1">
@@ -107,11 +115,10 @@
         
         <!-- Título e Introdução -->
         <header class="mb-8">
-            <!-- TÍTULO H1 ALTERADO -->
-            <h1 class="text-4xl font-extrabold text-primary-blue mb-2">
+            <h1 id="mainTitle" class="text-4xl font-extrabold text-primary-blue mb-2">
                 Checklist Processual - Spencer Advogados
             </h1>
-            <p class="text-lg text-gray-600">
+            <p id="subTitle" class="text-lg text-gray-600">
                 Guia passo a passo para a elaboração de peças processuais, garantindo conformidade e estratégia.
             </p>
             <!-- Campos para o PDF -->
@@ -181,12 +188,12 @@
     </div>
 
     <script>
-        // Constantes para chaves do localStorage
-        const CHECKLIST_KEY = 'processualChecklistStatus';
-        const COMMENTS_KEY = 'processualComments';
+        // --- CHAVES DE PERSISTÊNCIA ---
+        const MODE_KEY = 'checklistMode';
+        let currentMode = localStorage.getItem(MODE_KEY) || 'COMPLEX';
 
-        // Dados do Checklist extraídos do documento
-        const checklistData = [
+        // --- DADOS DO CHECKLIST COMPLEXO (Original) ---
+        const complexChecklistData = [
             {
                 id: 'phase0',
                 title: 'FASE 0 — PREPARAÇÃO DOCUMENTAL',
@@ -257,8 +264,137 @@
             }
         ];
 
-        // Variável de estado para armazenar o status do checklist (usando localStorage)
-        let checklistStatus = JSON.parse(localStorage.getItem(CHECKLIST_KEY)) || {};
+        // --- DADOS DO CHECKLIST SIMPLES (Novo) ---
+        const simpleChecklistData = [
+            {
+                id: 's-phase1',
+                title: 'FASE 1 — FORMALIDADES E ENDEREÇAMENTO',
+                colorClass: 'phase-2', // Azul
+                items: [
+                    'Conferir o Endereçamento correto da peça (Juízo/Vara).',
+                    'Identificar e qualificar corretamente as Partes envolvidas.',
+                    'Incluir o Número do Processo e demais dados de identificação.',
+                    'Referenciar o ato processual com o ID/número do documento a que se refere (se for o caso).'
+                ]
+            },
+            {
+                id: 's-phase2',
+                title: 'FASE 2 — CONTEÚDO E DIREÇÃO',
+                colorClass: 'phase-1', // Vermelho/Laranja
+                items: [
+                    'Organizar o Raciocínio Lógico (Pedido claro e conciso).',
+                    'Dar o Direcionamento correto ao processo (pedido ou informação que se espera do Juízo).',
+                ]
+            },
+             {
+                id: 's-phase3',
+                title: 'FASE 3 — REVISÃO E FORMATO',
+                colorClass: 'phase-3', // Verde
+                items: [
+                    'Revisar ortografia e gramática (Revisar Português).',
+                    'Verificar a Formatação (margens, espaçamento, fonte) conforme normas do Tribunal.',
+                ]
+            },
+            {
+                id: 's-phase4',
+                title: 'FASE 4 — PROTOCOLO E REGISTRO',
+                colorClass: 'phase-4', // Preto
+                items: [
+                    'Salvar comprovante de protocolo/distribuição em PDF com nome padrão.',
+                    'Registrar o protocolo no sistema / AdvBox.',
+                ]
+            }
+        ];
+
+        // Variável de estado para armazenar o status do checklist (dinâmico)
+        let checklistStatus = {};
+
+        // --- FUNÇÕES DE PERSISTÊNCIA E MODO ---
+
+        /**
+         * Retorna a chave de armazenamento e os dados do checklist atuais.
+         */
+        function getCurrentChecklistData() {
+            if (currentMode === 'SIMPLE') {
+                return {
+                    data: simpleChecklistData,
+                    checklistKey: 'simpleChecklistStatus',
+                    commentsKey: 'simpleComments'
+                };
+            } else {
+                return {
+                    data: complexChecklistData,
+                    checklistKey: 'complexChecklistStatus',
+                    commentsKey: 'complexComments'
+                };
+            }
+        }
+
+        /**
+         * Carrega o estado do checklist e dos comentários com base no modo atual.
+         */
+        function loadCurrentState() {
+            const { checklistKey, commentsKey } = getCurrentChecklistData();
+            
+            // 1. Carrega o estado dos itens
+            const savedStatus = localStorage.getItem(checklistKey);
+            checklistStatus = savedStatus ? JSON.parse(savedStatus) : {};
+
+            // 2. Carrega os comentários
+            const commentsArea = document.getElementById('generalComments');
+            const savedComments = localStorage.getItem(commentsKey);
+            if (commentsArea) {
+                commentsArea.value = savedComments || '';
+                // Salva o novo key para a função oninput
+                commentsArea.oninput = saveComments;
+            }
+            
+            // 3. Renderiza a interface com o novo estado
+            renderChecklist();
+            updateModeDisplay();
+        }
+
+        /**
+         * Salva o conteúdo do campo de comentários no localStorage (usando a chave dinâmica).
+         */
+        function saveComments() {
+            const commentsArea = document.getElementById('generalComments');
+            const { commentsKey } = getCurrentChecklistData();
+            if (commentsArea) {
+                localStorage.setItem(commentsKey, commentsArea.value);
+            }
+        }
+        
+        /**
+         * Alterna entre o modo Complexo e Simples.
+         */
+        function switchChecklistMode() {
+            currentMode = currentMode === 'COMPLEX' ? 'SIMPLE' : 'COMPLEX';
+            localStorage.setItem(MODE_KEY, currentMode);
+            loadCurrentState();
+        }
+
+        /**
+         * Atualiza o título e o texto do botão de alternância.
+         */
+        function updateModeDisplay() {
+            const mainTitle = document.getElementById('mainTitle');
+            const subTitle = document.getElementById('subTitle');
+            const modeToggle = document.getElementById('modeToggle');
+
+            if (currentMode === 'SIMPLE') {
+                mainTitle.textContent = 'Checklist PEÇAS SIMPLES - Spencer Advogados';
+                subTitle.textContent = 'Checklist para petições e manifestações de conteúdo direto e foco na formalidade processual.';
+                modeToggle.textContent = 'Alternar para Peças Complexas';
+            } else {
+                mainTitle.textContent = 'Checklist PEÇAS COMPLEXAS - Spencer Advogados';
+                subTitle.textContent = 'Guia passo a passo para a elaboração de peças processuais complexas (iniciais, contestações), garantindo conformidade e estratégia.';
+                modeToggle.textContent = 'Alternar para Peças Simples';
+            }
+        }
+
+
+        // --- FUNÇÕES DE RENDERIZAÇÃO E LÓGICA DE ITENS ---
 
         /**
          * Renderiza todo o checklist na interface.
@@ -266,8 +402,9 @@
         function renderChecklist() {
             const container = document.getElementById('checklistContainer');
             container.innerHTML = ''; // Limpa o container
+            const { data: currentData } = getCurrentChecklistData();
 
-            checklistData.forEach(phase => {
+            currentData.forEach(phase => {
                 const isPhaseExpanded = checklistStatus[phase.id]?.isExpanded !== false; // Padrão: expandido
 
                 // Cria o cabeçalho da fase
@@ -337,13 +474,11 @@
 
         /**
          * Alterna o estado de um item (marcado/desmarcado) e salva o estado.
-         * @param {string} id - O ID único do item (fase-indice).
-         * @param {string} text - O texto do item.
-         * @param {boolean} checked - O novo estado.
          */
         function toggleItem(id, text, checked) {
+            const { checklistKey } = getCurrentChecklistData();
             checklistStatus[id] = checked;
-            localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklistStatus));
+            localStorage.setItem(checklistKey, JSON.stringify(checklistStatus));
 
             // Atualiza o estilo do texto
             const label = document.querySelector(`label[for="${id}"]`);
@@ -356,9 +491,9 @@
 
         /**
          * Alterna a expansão/colapso de uma fase.
-         * @param {Event} event - Evento de clique.
          */
         function togglePhase(event) {
+            const { checklistKey } = getCurrentChecklistData();
             const header = event.currentTarget;
             const phaseId = header.getAttribute('data-phase-id');
             const body = document.getElementById(phaseId + '-body');
@@ -371,7 +506,7 @@
             // Salva o estado de expansão
             if (!checklistStatus[phaseId]) checklistStatus[phaseId] = {};
             checklistStatus[phaseId].isExpanded = newExpandedState;
-            localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklistStatus));
+            localStorage.setItem(checklistKey, JSON.stringify(checklistStatus));
 
             // Aplica as classes Tailwind
             if (newExpandedState) {
@@ -391,10 +526,11 @@
          * Calcula e atualiza a barra e o texto de progresso.
          */
         function updateProgress() {
+            const { data: currentData } = getCurrentChecklistData();
             let totalItems = 0;
             let checkedItems = 0;
 
-            checklistData.forEach(phase => {
+            currentData.forEach(phase => {
                 phase.items.forEach((itemText, itemIndex) => {
                     const itemId = `${phase.id}-${itemIndex}`;
                     totalItems++;
@@ -428,39 +564,16 @@
         }
 
         /**
-         * Salva o conteúdo do campo de comentários no localStorage.
-         */
-        function saveComments() {
-            const commentsArea = document.getElementById('generalComments');
-            if (commentsArea) {
-                localStorage.setItem(COMMENTS_KEY, commentsArea.value);
-            }
-        }
-
-        /**
-         * Carrega o conteúdo do campo de comentários do localStorage.
-         */
-        function loadComments() {
-            const commentsArea = document.getElementById('generalComments');
-            if (commentsArea) {
-                const savedComments = localStorage.getItem(COMMENTS_KEY);
-                if (savedComments) {
-                    commentsArea.value = savedComments;
-                }
-            }
-        }
-        
-        /**
          * Limpa todo o checklist (itens marcados e comentários) e reseta a interface.
-         * Esta função deve ser chamada pelo botão de Limpar.
          */
         function clearChecklist() {
-            // Utilizamos um alerta discreto no console, pois alert/confirm/prompt são proibidos no ambiente.
-            console.log("AVISO: Tentativa de limpeza total do checklist. Todo o progresso salvo será apagado.");
+            const { checklistKey, commentsKey } = getCurrentChecklistData();
             
-            // 1. Limpa o localStorage
-            localStorage.removeItem(CHECKLIST_KEY);
-            localStorage.removeItem(COMMENTS_KEY);
+            console.log(`AVISO: Limpeza do modo ${currentMode}. Progresso salvo será apagado.`);
+            
+            // 1. Limpa o localStorage apenas para o modo atual
+            localStorage.removeItem(checklistKey);
+            localStorage.removeItem(commentsKey);
 
             // 2. Reseta o estado local
             checklistStatus = {};
@@ -473,7 +586,7 @@
             const today = new Date().toISOString().substring(0, 10);
             document.getElementById('dataConclusao').value = today;
             
-            // 5. Limpa a área de comentários
+            // 5. Limpa a área de comentários (se estiver visível/carregada)
             const commentsArea = document.getElementById('generalComments');
             if (commentsArea) {
                 commentsArea.value = '';
@@ -488,11 +601,13 @@
 
         /**
          * Inicia o processo de download, que usa a função nativa de impressão para gerar um PDF.
-         * Nota: O recurso 'no-print' esconde elementos irrelevantes para o documento.
          */
         function downloadPDF() {
+            const { checklistKey } = getCurrentChecklistData();
+            
             // Expande todas as fases antes de imprimir
-            checklistData.forEach(phase => {
+            const { data: currentData } = getCurrentChecklistData();
+            currentData.forEach(phase => {
                 const body = document.getElementById(phase.id + '-body');
                 const header = document.querySelector(`.phase-header[data-phase-id="${phase.id}"]`);
                 const icon = header.querySelector('svg');
@@ -507,7 +622,7 @@
                 if (!checklistStatus[phase.id]) checklistStatus[phase.id] = {};
                 checklistStatus[phase.id].isExpanded = true;
             });
-            localStorage.setItem(CHECKLIST_KEY, JSON.stringify(checklistStatus));
+            localStorage.setItem(checklistKey, JSON.stringify(checklistStatus));
 
             // Atualiza os campos de cabeçalho para ter certeza que estão no PDF
             document.getElementById('dataConclusao').value = document.getElementById('dataConclusao').value || new Date().toISOString().substring(0, 10);
@@ -516,7 +631,7 @@
             window.print();
         }
 
-        // Configura a data de conclusão para a data de hoje ao carregar, se vazia
+        // --- INICIALIZAÇÃO ---
         document.addEventListener('DOMContentLoaded', () => {
             const dataInput = document.getElementById('dataConclusao');
             if (!dataInput.value) {
@@ -524,10 +639,8 @@
                 dataInput.value = today;
             }
 
-            // Inicializa e renderiza o checklist
-            renderChecklist();
-            // Carrega os comentários salvos
-            loadComments();
+            // Carrega o modo salvo e o estado correspondente
+            loadCurrentState();
         });
     </script>
 </body>
